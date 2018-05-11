@@ -1,0 +1,195 @@
+============================================================================================================
+-------Angular_Cli.Json :
+============================================================================================================
+"styles": [
+        "../node_modules/bootstrap/dist/css/bootstrap.min.css",
+        "../node_modules/primeng/resources/primeng.min.css",
+        "../node_modules/primeng/resources/themes/omega/theme.css",
+        "../node_modules/font-awesome/css/font-awesome.min.css",
+]
+
+============================================================================================================
+----------interceptor.module.ts :
+============================================================================================================
+import { Injectable, NgModule } from '@angular/core'
+import { Observable } from 'rxjs/Observable'
+import { HttpEvent, HttpInterceptor, HttpHandler, HttpRequest, HttpHeaders } from '@angular/common/http';
+import { HTTP_INTERCEPTORS } from '@angular/common/http';
+import { environment } from "../environments/environment";
+
+@Injectable()
+export class HttpsRequestInterceptor implements HttpInterceptor {
+    intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> { 
+        var baseUrl: string = environment.rpaApiUrl;
+        var fullUrl = baseUrl + req.url;
+        let dupReq;
+        if (req.url.toLowerCase() == 'token') {
+            dupReq = req.clone({ url: fullUrl });
+        }
+        else {
+            dupReq = req.clone(
+                {
+                    headers: req.headers.set('content-type', 'application/json')
+                        .set('accept', 'application/json')
+                        .set('Authorization', 'bearer ' + sessionStorage.getItem('id_token')), url: fullUrl
+                });
+        }
+        return next.handle(dupReq);
+    }
+};
+
+@NgModule({
+    providers: [
+        { provide: HTTP_INTERCEPTORS, useClass: HttpsRequestInterceptor, multi: true }
+    ]
+})
+export class InterceptorModule { }
+
+====================================================================================================================================
+------------app-routing.module.ts :
+====================================================================================================================================
+ 
+ import { NgModule } from "@angular/core";
+import { Routes, RouterModule } from "@angular/router";
+import { LoginComponent } from "./login/login.component";
+import { HomeComponent } from "./home/home.component";
+
+const routes: Routes = [
+    { path: 'login', loadChildren: './login/login.module#LoginModule' },
+    { path: 'home', loadChildren: './home/home.module#HomeModule' },
+    { path: 'nodered', loadChildren: './node-red/node-red.module#NodeRedModule' },
+    { path: 'botconfig', loadChildren: './machine-config/machine-config.module#MachineConfigModule' },
+    { path: 'flow', loadChildren: './flow-setting/flow-setting.module#FlowSettingModule' },
+    { path: 'audit', loadChildren: './audit-setting/audit-setting.module#AuditSettingModule' },
+    { path: 'process', loadChildren: './process-config/process-config.module#ProcessConfigModule' },
+    { path: 'processrerun', loadChildren: './process-rerun/process-rerun.module#ProcessRerunModule' },
+    { path: 'machinesetting', loadChildren: './machine-setting/machine-setting.module#MachineSettingModule' },
+    { path: '', redirectTo: '/login', pathMatch: 'full' }
+]
+@NgModule({
+    imports: [RouterModule.forRoot(routes, { useHash: true })],
+    exports: [RouterModule]
+})
+export class AppRoutingModule { }
+
+============================================================================================================
+--------- Sample.Service.ts
+============================================================================================================
+ //All Sample List
+    getSampleList(): Observable<any> {
+        return this.httpClient.get<any>('api/samples').map(response => response);
+    }
+
+    // Get sample by _id or name
+    getByIdOrName(IdOrName): Observable<Sample> {
+        return this.httpClient.get<Sample>('api/sample/' + idOrName).map(response => response);
+    }
+
+    // Add new Sample
+    addSample(sample: Sample): Observable<Sample> { 
+        return this.httpClient.post<Sample>('api/sample/', sample).map(response => response);
+    }
+
+    // Update sample by _id
+    update(sampleId, sample: Sample): Observable<Sample> {
+        return this.httpClient.put<Sample>('api/sample/' + sampleId, sample).map(response => response);
+    }
+
+    // Remove by _id
+    removeById(sampleId): Observable<Sample> {
+        return this.httpClient.delete<Sample>('api/sample/' + sampleId).map(response => response);
+    }
+==========================================================================================================================
+-----SampleComponent.ts
+==========================================================================================================================
+
+  getMachineList() {
+    this.machineConfigService.getMachineList().subscribe(
+      (data) => {
+        this.machineConfig = data;
+        this.noRecordFound(data);
+      }
+    );
+  }
+
+  //Get machine list by name or id
+  getMachineByIdOrName(machineIdOrName) {
+    this.machineConfigService.getMachineByIdOrName(machineIdOrName).subscribe(
+      data => {
+      }, error => {
+        console.log(error);
+      });
+  }
+
+  //On update
+  onUpdate(machine: MachineConfig) {
+    this.isNewMachine = false;
+    this.machine = machine;
+    this.displayDialog = true;
+    this.getMachineList();
+  }
+
+  // Save /Update machine depend on isNewMachine flag
+  saveMachine() {
+    if (this.isNewMachine) {
+      this.addMachine();
+    }
+    else {
+      this.updateMachine(this.machine);
+    }
+    this.cancelDialog();
+  }
+
+  //Add new machine
+  addMachine() {
+    this.machineConfigService.addMachine(this.machine).subscribe(
+      data => {
+        this.messageService.add({ severity: 'success', summary: "Machine Details Saved." });
+        this.cancelDialog();
+        this.getMachineList();
+      }, error => {
+        console.log(error);
+      });
+  }
+
+  //Update machine by Id
+  updateMachine(machine: MachineConfig) {
+    console.log('in updateMachine')
+    console.log(machine._id);
+    console.log(machine);
+    
+    this.machineConfigService.updateMachine(machine._id, machine).subscribe(
+      data => {
+        // console.log(data);
+        // this.messageService.add({ severity: 'success', summary: "Machine Details Updated." });
+        this.getMachineList();
+        this.isNewMachine = true;
+      }, error => {
+        console.log(error);
+      });
+  }
+==============================================================================================
+------------ machine-config-routing.module.ts
+==============================================================================================
+import { NgModule } from "@angular/core";
+import { Routes, RouterModule } from "@angular/router";
+
+import { MachineConfigComponent } from "./machine-config.component";
+
+const routes: Routes = [
+    {
+        path: '',
+        component: MachineConfigComponent,
+        children: [
+            //     //{path:'',component:ListComponent},
+            //     //{path:':id',component:DetailComponent}
+        ]
+    }
+]
+@NgModule({
+    imports: [RouterModule.forChild(routes)],
+    exports: [RouterModule]
+})
+export class MachineConfigRoutingModule { }
+
+ 
